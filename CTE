@@ -1,0 +1,129 @@
+1. CTE for Identifying Top 10 Countries:
+
+WITH top_countries AS (
+    SELECT 
+        country.country_id,
+        country.country,
+        COUNT(customer.customer_id) AS customer_count
+    FROM 
+        country
+    JOIN 
+        city ON country.country_id = city.country_id
+    JOIN 
+        address ON city.city_id = address.city_id
+    JOIN 
+        customer ON address.address_id = customer.address_id
+    GROUP BY 
+        country.country_id, country.country
+    ORDER BY 
+        customer_count DESC
+    LIMIT 10
+)
+
+2. CTE for Counting Total Customers in Each Country:
+
+WITH top_countries AS (
+    -- CTE from step 1
+),
+customer_counts AS (
+    SELECT 
+        co.country_id,
+        COUNT(DISTINCT customer.customer_id) AS all_customer_count
+    FROM 
+        top_countries co
+    JOIN 
+        city ON co.country_id = city.country_id
+    JOIN 
+        address ON city.city_id = address.city_id
+    JOIN 
+        customer ON address.address_id = customer.address_id
+    GROUP BY 
+        co.country_id
+)
+
+Explanation:
+
+In the first CTE, named "top_countries", we retrieve the top 10 countries based on customer counts.
+In the second CTE, named "customer_counts", we count the total number of customers in each country identified in the first CTE.
+Each CTE encapsulates a specific part of the query, improving readability and organization.
+These CTEs can now be used in the main query to achieve the same results as the original queries.
+
+3. CTE to find out how many of the top 5 customers identified in the top 10 countries are based within each country
+
+WITH top_customers AS (
+    SELECT 
+        c.customer_id,
+        a.city_id,
+        ci.country_id
+    FROM 
+        customer c
+    JOIN 
+        address a ON c.address_id = a.address_id
+    JOIN 
+        city ci ON a.city_id = ci.city_id
+    JOIN 
+        country co ON ci.country_id = co.country_id
+    JOIN 
+        payment p ON c.customer_id = p.customer_id
+    WHERE 
+        ci.city_id IN (
+            SELECT 
+                city.city_id
+            FROM 
+                city
+            JOIN 
+                address ON city.city_id = address.city_id
+            JOIN 
+                customer ON address.address_id = customer.address_id
+            WHERE 
+                city.country_id IN (
+                    SELECT 
+                        country.country_id
+                    FROM 
+                        country
+                    JOIN 
+                        city ON country.country_id = city.country_id
+                    JOIN 
+                        address ON city.city_id = address.city_id
+                    JOIN 
+                        customer ON address.address_id = customer.address_id
+                    GROUP BY 
+                        country.country_id
+                    ORDER BY 
+                        COUNT(customer.customer_id) DESC
+                    LIMIT 10
+                )
+            GROUP BY 
+                city.city_id
+            ORDER BY 
+                COUNT(customer.customer_id) DESC
+            LIMIT 10
+        )
+    GROUP BY 
+        c.customer_id, a.city_id, ci.country_id
+)
+SELECT 
+    country.country,
+    COUNT(DISTINCT customer.customer_id) AS all_customer_count,
+    COUNT(DISTINCT top_customers.customer_id) AS top_customer_count
+FROM 
+    country
+LEFT JOIN 
+    top_customers ON country.country_id = top_customers.country_id
+JOIN 
+    city ON top_customers.city_id = city.city_id
+JOIN 
+    address ON city.city_id = address.city_id
+JOIN 
+    customer ON address.address_id = customer.address_id
+GROUP BY 
+    country.country
+ORDER BY 
+    all_customer_count DESC;
+
+Explanation:
+
+In approaching this step, I first identified the original query that needed to be rewritten using a Common Table Expression (CTE). 
+Then, I extracted the subquery logic and encapsulated it within the CTE named "top_customers". Next, I utilized this CTE in the 
+main query to calculate the counts of all customers and top customers for each country, resulting in a more modular and readable 
+SQL statement.
