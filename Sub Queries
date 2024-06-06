@@ -1,0 +1,181 @@
+1. Identify top 10 countries 
+
+SELECT country.country_id, country.country, COUNT(customer.customer_id) AS customer_count
+FROM country
+JOIN city ON country.country_id = city.country_id
+JOIN address ON city.city_id = address.city_id
+JOIN customer ON address.address_id = customer.address_id
+GROUP BY country.country_id, country.country
+ORDER BY customer_count DESC
+LIMIT 10;
+
+Explanation:
+
+We join the country table with the city, address, and customer tables using their respective foreign keys (country_id, city_id, and address_id).
+We use the COUNT() function to count the number of customers (customer_id) in each country.
+The GROUP BY clause groups the results by country to aggregate customer counts.
+The results are sorted in descending order of customer count using the ORDER BY clause.
+Finally, we use the LIMIT clause to limit the output to the top 10 countries.
+
+2. Identify the top 10 cities that fall within the top 10 countries
+
+SELECT city.city_id, city.city, COUNT(customer.customer_id) AS customer_count
+FROM city
+JOIN address ON city.city_id = address.city_id
+JOIN customer ON address.address_id = customer.address_id
+WHERE city.country_id IN (
+    SELECT country.country_id
+    FROM country
+    JOIN city ON country.country_id = city.country_id
+    JOIN address ON city.city_id = address.city_id
+    JOIN customer ON address.address_id = customer.address_id
+    GROUP BY country.country_id
+    ORDER BY COUNT(customer.customer_id) DESC
+    LIMIT 10
+)
+GROUP BY city.city_id, city.city
+ORDER BY customer_count DESC
+LIMIT 10;
+
+Explanation:
+
+The subquery retrieves the top 10 countries identified in step 1 based on customer counts.
+We join the city table with the address and customer tables using their respective foreign keys (city_id and address_id).
+The WHERE clause filters the cities based on the top 10 countries identified in the subquery.
+We use the COUNT() function to count the number of customers (customer_id) in each city.
+The GROUP BY clause groups the results by city to aggregate customer counts.
+The results are sorted in descending order of customer count using the ORDER BY clause.
+Finally, we use the LIMIT clause to limit the output to the top 10 cities.
+
+3. Top 5 customers from top 10 cities
+
+SELECT 
+    c.customer_id,
+    c.first_name,
+    c.last_name,
+    co.country,
+    ci.city,
+    SUM(p.amount) AS total_amount_paid
+FROM 
+    customer c
+JOIN 
+    address a ON c.address_id = a.address_id
+JOIN 
+    city ci ON a.city_id = ci.city_id
+JOIN 
+    country co ON ci.country_id = co.country_id
+JOIN 
+    payment p ON c.customer_id = p.customer_id
+WHERE 
+    ci.city_id IN (
+        SELECT 
+            city.city_id
+        FROM 
+            city
+        JOIN 
+            address ON city.city_id = address.city_id
+        JOIN 
+            customer ON address.address_id = customer.address_id
+        WHERE 
+            city.country_id IN (
+                SELECT 
+                    country.country_id
+                FROM 
+                    country
+                JOIN 
+                    city ON country.country_id = city.country_id
+                JOIN 
+                    address ON city.city_id = address.city_id
+                JOIN 
+                    customer ON address.address_id = customer.address_id
+                GROUP BY 
+                    country.country_id
+                ORDER BY 
+                    COUNT(customer.customer_id) DESC
+                LIMIT 10
+            )
+        GROUP BY 
+            city.city_id
+        ORDER BY 
+            COUNT(customer.customer_id) DESC
+        LIMIT 10
+    )
+GROUP BY 
+    c.customer_id, c.first_name, c.last_name, co.country, ci.city
+ORDER BY 
+    total_amount_paid DESC
+LIMIT 5;
+
+
+Explanation:
+
+The query starts by joining the customer, address, city, country, and payment tables to gather information about customers, their addresses, payments, and the corresponding cities and countries.
+It uses subqueries to first identify the top 10 cities within the top 10 countries based on customer counts, then selects the top 5 customers from these cities who've paid the highest total amounts to Rockbuster.
+The main query calculates the total amount paid by each customer in the top cities, groups the results by customer, and sorts them in descending order of total amount paid.
+Finally, it limits the output to the top 5 customers who've paid the highest total amounts.
+
+4. Average amount paid in top cities within top countries
+
+SELECT AVG(subquery.total_amount)
+FROM (
+    SELECT 
+        c.customer_id,
+        c.first_name,
+        c.last_name,
+        co.country,
+        ci.city,
+        SUM(p.amount) AS total_amount
+    FROM 
+        customer c
+    JOIN 
+        address a ON c.address_id = a.address_id
+    JOIN 
+        city ci ON a.city_id = ci.city_id
+    JOIN 
+        country co ON ci.country_id = co.country_id
+    JOIN 
+        payment p ON c.customer_id = p.customer_id
+    WHERE 
+        ci.city_id IN (
+            SELECT 
+                city.city_id
+            FROM 
+                city
+            JOIN 
+                address ON city.city_id = address.city_id
+            JOIN 
+                customer ON address.address_id = customer.address_id
+            WHERE 
+                city.country_id IN (
+                    SELECT 
+                        country.country_id
+                    FROM 
+                        country
+                    JOIN 
+                        city ON country.country_id = city.country_id
+                    JOIN 
+                        address ON city.city_id = address.city_id
+                    JOIN 
+                        customer ON address.address_id = customer.address_id
+                    GROUP BY 
+                        country.country_id
+                    ORDER BY 
+                        COUNT(customer.customer_id) DESC
+                    LIMIT 10
+                )
+            GROUP BY 
+                city.city_id
+            ORDER BY 
+                COUNT(customer.customer_id) DESC
+            LIMIT 10
+        )
+    GROUP BY 
+        c.customer_id, c.first_name, c.last_name, co.country, ci.city
+) AS subquery;
+
+Explanation:
+
+The subquery calculates the total amount paid by each customer in the top cities within the top countries.
+The outer statement calculates the average of the total amounts paid from the subquery results.
+We use the alias "total_amount_paid" for the subquery and "average" for the outer statement to refer to them accurately.
+When referring to the subquery in the outer statement, we use its alias "total_amount_paid".
